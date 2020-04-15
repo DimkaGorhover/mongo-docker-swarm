@@ -1,0 +1,82 @@
+version: '3.7'
+
+networks:
+  app_net_swarm:
+    name: 'app_net_swarm'
+    driver: overlay
+    attachable: true
+    external: false
+
+volumes:
+  mongo-db-data:
+
+services:
+
+  # ----- docker swarm visualizer -----
+
+  visualizer:
+    image: dockersamples/visualizer:latest
+    ports:
+      - "8080:8080/tcp"
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+      - type: volume
+        source: mongo-db-data
+        target: /data/db
+    networks:
+      app_net_swarm:
+        aliases:
+          - visualizer
+          - visualizer.lc
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  # ----- mongo -----
+
+  mongo:
+    image: romans/mongo:4.2.5-bionic
+    container_name: mongo
+    build:
+      context: mongo
+      dockerfile: Dockerfile
+    networks:
+      app_net_swarm:
+        aliases:
+          - mongodb
+          - mongodb.lc
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # ----- mongo admin web page -----      
+
+  mongo-express:
+    image: mongo-express:0.54.0
+    container_name: mongo-express
+    networks:
+      app_net_swarm:
+        aliases:
+          - mongo
+          - mongo.lc
+    depends_on:
+      - mongo
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: example
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure

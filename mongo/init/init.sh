@@ -1,0 +1,1 @@
+echo 'hello init file'
